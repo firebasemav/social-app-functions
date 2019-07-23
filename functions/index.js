@@ -59,13 +59,38 @@ app.post('/scream' , (req, res) => {
         })
 });
 
+const isEmail = (email) => {
+    const RegEx = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    if(email.match(RegEx)) return true;
+    else return false;
+}
+
+const isEmpty = (string) => {
+    if(string.trim() === '') return true;
+    else return false;
+}
+
 app.post('/signup', (req,res) => {
     const newUser = {
         email: req.body.email,
         password: req.body.password,
         confirmPassword: req.body.confirmPassword,
         handle: req.body.handle,
+    };
+
+    let errors = {};
+
+    if(isEmpty(newUser.email)) {
+        errors.email = 'Must not be empty'
+    } else if (!isEmail(newUser.email)){
+        errors.email = "Must be a valid email address"
     }
+
+    if(isEmpty(newUser.password)) errors.password = 'Must not be empty';
+    if(newUser.password !== newUser.confirmPassword) errors.confirmPassword = 'Password does not match.';
+    if(isEmpty(newUser.handle)) errors.handle = 'Must not be empty';
+
+    if(Object.keys(errors).length > 0) res.status(400).json(errors);
 
     let token, userId;
 
@@ -103,5 +128,34 @@ app.post('/signup', (req,res) => {
             }
         })
 });
+
+app.post('/login', (req, res) => {
+    const user = {
+        email: req.body.email,
+        password: req.body.password
+    };
+
+    let errors = {};
+
+    if(isEmpty(user.email)) errors.email = "Must not be empty";
+    if(isEmpty(user.password)) errors.password = "Must not be empty";
+
+    if(Object.keys(errors).length > 0) return res.status(400).json(errors);
+
+    firebase.auth().signInWithEmailAndPassword(user.email, user.password)
+        .then(data => {
+            return data.user.getIdToken();
+        })
+        .then(token => {
+            return res.json({token});
+        })
+        .catch(err => {
+            console.error(err);
+            if(err.code === 'auth/wrong-password'){
+                return res.status(403).json({ general: 'Incorrect Password. Please try again.'});
+            } else return res.status(500).json({error: err.code});
+        })
+
+})
 
 exports.api = functions.region('asia-east2').https.onRequest(app);
